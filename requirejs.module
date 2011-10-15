@@ -3,6 +3,16 @@
 function requirejs_settings($settings = NULL) {
   static $cache = array();
 
+  // this should be set via hook_require_paths()
+  unset($settings['paths']);
+  // TODO: these aren't supported for now because I don't understand them
+  unset($settings['packagePaths']);
+  unset($settings['packages']);
+  // TODO: will increase complexity significantly, punting for now
+  unset($settings['context']);
+  // Choas!
+  unset($settings['deps']);
+
   if (!is_null($settings)) {
     $cache = array_merge($cache, $settings);
   }
@@ -10,7 +20,7 @@ function requirejs_settings($settings = NULL) {
   return $cache;
 }
 
-function requirejs_get_path() {
+function requirejs_get_library_path() {
   static $path = NULL;
 
   if (is_null($path)) {
@@ -23,42 +33,103 @@ function requirejs_get_path() {
   return $path;
 }
 
-function requirejs_add($module, $settings = NULL) {
+function _requirejs_create_layer($profile) {
+  $name = str_replace('/', '-', $profile['name']);
+  $path = file_create_path() . '/requirejs/' . $name;
+  $dest = realpath('.') . '/' . $path . '.js';
+
+  if (!file_exists($dest)) {
+    $profile['out'] = $dest;
+
+    $profile_path = tempnam(file_directory_temp(), 'rjs');
+    $fd = fopen($profile_path, "w");
+    fwrite($fd, drupal_to_js($profile));
+    fclose($fd);
+
+    system('r.js -o ' . $profile_path, $retval);
+    unlink($profile_path);
+    if ($retval != 0) return FALSE;
+  }
+
+  return $path;
+}
+
+function requirejs_get_paths($include_layers = FALSE) {
+  static $paths = NULL;
+  static $layers = NULL;
+
+  if (is_null($paths)) {
+    $path = requirejs_get_library_path();
+
+    // default paths for built-in plugins
+    $paths = array(
+      'text'     => "$path/text",
+      'domReady' => "$path/domReady",
+      'order'    => "$path/order",
+      'cs'       => "$path/cs",
+      'i18n'     => "$path/i18n",
+    );
+    // override with stuff from other modules
+    $paths = array_merge($paths, (array)module_invoke_all('requirejs_paths'));
+  }
+
+  if ($include_layers) {
+    if (is_null($layers)) {
+      $layers = array();
+      foreach ((array)module_invoke_all('requirejs_layers') as $name => $profile) {
+        $profile = (array)$profile;
+        $profile['name'] = $name;
+        $profile['paths'] = $paths;
+        $profile['baseUrl'] = realpath('.');
+
+        if ($layer_path = _requirejs_create_layer($profile)) {
+          $layers[$name] = $layer_path;
+        }
+      }
+    }
+
+    return array_merge($paths, $layers);
+  }
+
+  return $paths;
+}
+
+function requirejs_add_core() {
   static $added = FALSE;
+
+  if (($path = requirejs_get_library_path()) && !$added) {
+    drupal_add_js("$path/require.js");
+    $added = TRUE;
+  }
+  else {
+    drupal_set_message('This page uses require.js but it hasn\'t been downloaded and installed in the library path', 'error');
+  }
+}
+
+function requirejs_add($module) {
   static $modules = array();
 
   if (is_null($module)) {
     return $modules;
   }
 
-  // Remove the .js extension, because we don't support plain javascript via requirejs_add()
-  // The problem is that we have no idea what page we're on and how to find our way back to
-  // the base url, so we just support AMD.
+  requirejs_add_core();
+
+  // Attempt to make plain .js files work!
   if (substr($module, -3) == '.js') {
-    watchdog('requirejs', 'Plain JavaScript not supported, removing .js extension: %module', array('%module' => $module), WATCHDOG_WARNING);
-    $module = substr($module, 0, -3);
-  }
-
-  $path = requirejs_get_path();
-  if (!$path) {
-    drupal_set_message('This page uses require.js but it hasn\'t been downloaded and installed in the library path', 'error');
-    return;
-  }
-
-  if (!$added) {
-    drupal_add_js(requirejs_get_path() . '/require.js');
-    $added = TRUE;
-  }
-  
-  if (!is_null($settings)) {
-    requirejs_settings($settings);
+    if (substr($module, 0, 1) != '/') {
+      $module = base_path() . $module;
+    }
+    if (!file_exists($module)) {
+      watchdog('requirejs', 'Unable to find JavaScript file (did you mean to put .js on the end?): %module', array('%module' => $module), WATCHDOG_WARNING);
+    }
   }
 
   $modules[] = (string)$module;
 }
 
 function requirejs_preprocess_page(&$variables) {
-  $path = requirejs_get_path();
+  $path = requirejs_get_library_path();
   if (!$path) return;
 
   $modules = requirejs_add(NULL);
@@ -67,28 +138,14 @@ function requirejs_preprocess_page(&$variables) {
   // build the requirejs settings!
   $settings = requirejs_settings();
   $settings['baseUrl'] = base_path();
-  $settings['paths'] = array_merge(
-    // default paths for built-in plugins
-    array(
-      //'require'  => "$path/require.js",
-      'text'     => "$path/text",
-      'domReady' => "$path/domReady",
-      'order'    => "$path/order",
-      'cs'       => "$path/cs",
-      'i18n'     => "$path/i18n",
-    ),
-    // override with stuff from other modules
-    (array)module_invoke_all('requirejs_paths'),
-    // override with stuff from this specific call
-    (array)$settings['paths']);
+  $settings['paths'] = requirejs_get_paths(TRUE);
+  $settings['deps'] = $modules;
 
   // create the HTML/JS to put into the page
   $js =  "<script>\n<!--//--><![CDATA[//><!--\n";
-  $js .= "require.config(" . drupal_to_js($settings) . ");\n";
-  // TODO: should we fire some JavaScript event on require finish?
-  $js .= "require(" . drupal_to_js($modules) . ", function () { });\n";
+  $js .= "require = " . drupal_to_js($settings) . ";\n";
   $js .= "//--><!]]>\n</script>\n";
 
-  $variables['scripts'] .= $js;
+  $variables['scripts'] = $js . $variables['scripts'];
 }
 

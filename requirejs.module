@@ -1,0 +1,94 @@
+<?php
+
+function requirejs_settings($settings = NULL) {
+  static $cache = array();
+
+  if (!is_null($settings)) {
+    $cache = array_merge($cache, $settings);
+  }
+
+  return $cache;
+}
+
+function requirejs_get_path() {
+  static $path = NULL;
+
+  if (is_null($path)) {
+    $path = libraries_get_path('requirejs');
+    if (!file_exists("$path/require.js")) {
+      $path = FALSE;
+    }
+  }
+
+  return $path;
+}
+
+function requirejs_add($module, $settings = NULL) {
+  static $added = FALSE;
+  static $modules = array();
+
+  if (is_null($module)) {
+    return $modules;
+  }
+
+  // Remove the .js extension, because we don't support plain javascript via requirejs_add()
+  // The problem is that we have no idea what page we're on and how to find our way back to
+  // the base url, so we just support AMD.
+  if (substr($module, -3) == '.js') {
+    watchdog('requirejs', 'Plain JavaScript not supported, removing .js extension: %module', array('%module' => $module), WATCHDOG_WARNING);
+    $module = substr($module, 0, -3);
+  }
+
+  $path = requirejs_get_path();
+  if (!$path) {
+    drupal_set_message('This page uses require.js but it hasn\'t been downloaded and installed in the library path', 'error');
+    return;
+  }
+
+  if (!$added) {
+    drupal_add_js(requirejs_get_path() . '/require.js');
+    $added = TRUE;
+  }
+  
+  if (!is_null($settings)) {
+    requirejs_settings($settings);
+  }
+
+  $modules[] = (string)$module;
+}
+
+function requirejs_preprocess_page(&$variables) {
+  $path = requirejs_get_path();
+  if (!$path) return;
+
+  $modules = requirejs_add(NULL);
+  if (empty($modules)) return;
+
+  // build the requirejs settings!
+  $settings = requirejs_settings();
+  $settings['baseUrl'] = base_path();
+  $settings['paths'] = array_merge(
+    // default paths for built-in plugins
+    array(
+      //'require'  => "$path/require.js",
+      'text'     => "$path/text",
+      'domReady' => "$path/domReady",
+      'order'    => "$path/order",
+      'cs'       => "$path/cs",
+      'i18n'     => "$path/i18n",
+    ),
+    // override with stuff from other modules
+    (array)module_invoke_all('requirejs_paths'),
+    // override with stuff from this specific call
+    (array)$settings['paths']);
+
+  // create the HTML/JS to put into the page
+  $js =  "<script>\n<!--//--><![CDATA[//><!--\n";
+  $js .= "require.config(" . drupal_to_js($settings) . ");\n";
+  // TODO: should we fire some JavaScript event on require finish?
+  $js .= "require(" . drupal_to_js($modules) . ", function () { });\n";
+  $js .= "//--><!]]>\n</script>\n";
+
+  $variables['scripts'] .= $js;
+}
+

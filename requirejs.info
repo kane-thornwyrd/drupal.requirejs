@@ -1,0 +1,5 @@
+name = Integration with require.js
+description = Allows other modules to implement sophisticated JavaScript applications with require.js
+core = 6.x
+dependencies[] = libraries
+

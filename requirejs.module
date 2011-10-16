@@ -87,9 +87,33 @@ function requirejs_get_optimizer_path() {
   return $path;
 }
 
+function requirejs_get_cache_path() {
+  return file_directory_path() . '/requirejs';
+}
+
+function requirejs_clear_optimizer_cache() {
+  $path = requirejs_get_cache_path();
+  if ($dh = opendir($path)) {
+    while (($file = readdir($dh)) !== FALSE) {
+      if ($file != '.' && $file != '..') {
+        unlink("$path/$file");
+      }
+    }
+    closedir($dh);
+  }
+}
+
+/**
+ * Implementation of hook_flush_caches().
+ */
+function requirejs_flush_caches() {
+  requirejs_clear_optimizer_cache();
+  return array();
+}
+
 function _requirejs_create_layer($profile) {
   $name = str_replace('/', '-', $profile['name']);
-  $path = file_create_path() . '/requirejs/' . $name;
+  $path = requirejs_get_cache_path() . '/' . $name;
   $dest = realpath('.') . '/' . $path . '.js';
 
   if (!file_exists($dest)) {

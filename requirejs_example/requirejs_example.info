@@ -1,0 +1,4 @@
+name = Require.js example
+description = Example module demonstrating how to use the Require.js module
+core = 6.x
+

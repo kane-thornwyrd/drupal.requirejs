@@ -14,5 +14,6 @@ TODO (2011-10-15):
    o How to install and configure
    o Be careful with filenames and .js!
    o hooks
+   o Public function API documentation
    o Include an example module (requirejs_example)
 

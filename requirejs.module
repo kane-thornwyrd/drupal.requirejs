@@ -159,48 +159,73 @@ function _requirejs_validate_layer($path, $dest) {
   return FALSE;
 }
 
-function requirejs_get_layers() {
+function requirejs_get_layers($rebuild = FALSE) {
   static $layers = NULL;
 
-  // TODO: we should use the Drupal cache_get/cache_set mechanisms
+  if ($rebuild) {
+    $layers = NULL;
+  }
 
   if (is_null($layers)) {
-    $layers = (array)module_invoke_all('requirejs_layers');
-    drupal_alter('requirejs_layers', $layers);
+    if (!$rebuild) {
+      $cache = cache_get('requirejs:layers');
+      if ($cache) {
+        $layers = $cache->data;
+      }
+    }
+    if (is_null($layers)) {
+      $layers = (array)module_invoke_all('requirejs_layers');
+      drupal_alter('requirejs_layers', $layers);
+      cache_set('requirejs:layers', $layers);
+    }
   }
 
-  return $layers;
+  return (array)$layers;
 }
 
-function requirejs_get_paths() {
+function requirejs_get_paths($rebuild = FALSE) {
   static $paths = NULL;
 
-  // TODO: we should use the Drupal cache_get/cache_set mechanism
-
-  if (is_null($paths)) {
-    $path = requirejs_get_library_path();
-
-    // default paths for built-in plugins
-    $paths = array(
-      'text'     => "$path/text",
-      'domReady' => "$path/domReady",
-      'order'    => "$path/order",
-      'cs'       => "$path/cs",
-      'i18n'     => "$path/i18n",
-    );
-    // override with stuff from other modules
-    $paths = array_merge($paths, (array)module_invoke_all('requirejs_paths'));
-    // allow an alter hook
-    drupal_alter('requirejs_paths', $paths);
+  if ($rebuild) {
+    $paths = NULL;
   }
 
-  return $paths;
+  if (is_null($paths)) {
+    if (!$rebuild) {
+      $cache = cache_get('requirejs:paths');
+      if ($cache) {
+        $paths = $cache->data;
+      }
+    }
+    if (is_null($paths)) {
+      $path = requirejs_get_library_path();
+
+      if ($path) {
+        // default paths for built-in plugins
+        $paths = array(
+          'text'     => "$path/text",
+          'domReady' => "$path/domReady",
+          'order'    => "$path/order",
+          'cs'       => "$path/cs",
+          'i18n'     => "$path/i18n",
+        );
+
+        // override with stuff from other modules
+        $paths = array_merge($paths, (array)module_invoke_all('requirejs_paths'));
+        drupal_alter('requirejs_paths', $paths);
+        
+        cache_set('requirejs:paths', $paths);
+      }
+    }
+  }
+
+  return (array)$paths;
 }
 
 function requirejs_add_core() {
   static $added = FALSE;
 
-  if (($path = requirejs_get_library_path()) && !$added) {
+  if (!$added && ($path = requirejs_get_library_path())) {
     drupal_add_js("$path/require.js");
     $added = TRUE;
   }

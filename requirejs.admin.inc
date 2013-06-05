@@ -1,8 +1,6 @@
 <?php
 
-function requirejs_admin_settings(&$form_state) {
-  $form = array();
-
+function requirejs_admin_settings($form, &$form_state) {
   $form['optimizer'] = array(
     '#title' => t('Optimizer'),
     '#type' => 'fieldset',
@@ -29,7 +27,7 @@ function requirejs_admin_settings(&$form_state) {
   return system_settings_form($form);
 }
 
-function requirejs_admin_clear_optimizer_cache(&$form_state) {
+function requirejs_admin_clear_optimizer_cache($form, &$form_state) {
   requirejs_clear_optimizer_cache();
   drupal_set_message(t('Optimizer cache cleared.'));
 }

@@ -40,7 +40,7 @@ function requirejs_perm() {
 }
 
 function requirejs_settings($settings = NULL) {
-  static $cache = array();
+  $cache = &drupal_static(__FUNCTION__);
 
   // this should be set via hook_require_paths()
   unset($settings['paths']);
@@ -60,7 +60,7 @@ function requirejs_settings($settings = NULL) {
 }
 
 function requirejs_get_library_path() {
-  static $path = NULL;
+  $path = &drupal_static(__FUNCTION__);
 
   if (is_null($path)) {
     $path = libraries_get_path('requirejs');
@@ -82,7 +82,7 @@ function _requirejs_check_bin($name) {
 }
 
 function requirejs_get_optimizer_path() {
-  static $path = NULL;
+  $path = &drupal_static(__FUNCTION__);
 
   if (is_null($path)) {
     $path = variable_get('requirejs_optimizer_path', NULL);
@@ -137,7 +137,7 @@ function _requirejs_generate_layer($path, $dest) {
     if ($retval != 0) {
       watchdog('requirejs', 'Unable to run r.js optimizer (%optimizer) for %module',
         array('%optimizer' => $optimizer_path, '%module' => $profile['name']), WATCHDOG_ERROR);
-      return FALSE; 
+      return FALSE;
     }
   }
 
@@ -160,7 +160,7 @@ function _requirejs_validate_layer($path, $dest) {
 }
 
 function requirejs_get_layers($rebuild = FALSE) {
-  static $layers = NULL;
+  $layers = &drupal_static(__FUNCTION__);
 
   if ($rebuild) {
     $layers = NULL;
@@ -184,7 +184,7 @@ function requirejs_get_layers($rebuild = FALSE) {
 }
 
 function requirejs_get_paths($rebuild = FALSE) {
-  static $paths = NULL;
+  $paths = &drupal_static(__FUNCTION__);
 
   if ($rebuild) {
     $paths = NULL;
@@ -213,7 +213,7 @@ function requirejs_get_paths($rebuild = FALSE) {
         // override with stuff from other modules
         $paths = array_merge($paths, (array)module_invoke_all('requirejs_paths'));
         drupal_alter('requirejs_paths', $paths);
-        
+
         cache_set('requirejs:paths', $paths);
       }
     }
@@ -223,7 +223,7 @@ function requirejs_get_paths($rebuild = FALSE) {
 }
 
 function requirejs_add_core() {
-  static $added = FALSE;
+  $added = &drupal_static(__FUNCTION__);
 
   if (!$added && ($path = requirejs_get_library_path())) {
     drupal_add_js("$path/require.js");
@@ -235,7 +235,7 @@ function requirejs_add_core() {
 }
 
 function requirejs_add($module) {
-  static $modules = array();
+  $modules = &drupal_static(__FUNCTION__);
 
   if (is_null($module)) {
     return $modules;

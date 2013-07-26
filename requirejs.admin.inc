@@ -31,4 +31,3 @@ function requirejs_admin_clear_optimizer_cache($form, &$form_state) {
   requirejs_clear_optimizer_cache();
   drupal_set_message(t('Optimizer cache cleared.'));
 }
-

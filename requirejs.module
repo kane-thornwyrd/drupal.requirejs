@@ -1,7 +1,11 @@
 <?php
+/**
+ * @file
+ * Requirejs module file.
+ */
 
 /**
- * Implementation of hook_menu().
+ * Implements hook_menu().
  */
 function requirejs_menu() {
   $items = array();
@@ -18,7 +22,7 @@ function requirejs_menu() {
 }
 
 /**
- * Implementation of hook_filesondemand().
+ * Implements hook_filesondemand().
  */
 function requirejs_filesondemand() {
   return array(
@@ -26,28 +30,37 @@ function requirejs_filesondemand() {
       'generate callback'      => '_requirejs_generate_layer',
       'validate path callback' => '_requirejs_validate_layer',
 
-      // never expire the cached items
+      // Never expire the cached items.
       'expires after' => FALSE,
     ),
   );
 }
 
 /**
- * Implementation of hook_perm().
+ * Implements hook_perm().
  */
 function requirejs_perm() {
   return array('administer requirejs');
 }
 
+/**
+ * Set/Get the settings for Require.js.
+ *
+ * @param {Array} $settings
+ *   New settings.
+ *
+ * @return {Array}
+ *   The settings.
+ */
 function requirejs_settings($settings = NULL) {
   $cache = &drupal_static(__FUNCTION__);
 
-  // this should be set via hook_require_paths()
+  // This should be set via hook_require_paths().
   unset($settings['paths']);
-  // TODO: these aren't supported for now because I don't understand them
+  // TODO: these aren't supported for now because I don't understand them.
   unset($settings['packagePaths']);
   unset($settings['packages']);
-  // TODO: will increase complexity significantly, punting for now
+  // TODO: will increase complexity significantly, punting for now.
   unset($settings['context']);
   // Chaos!
   unset($settings['deps']);
@@ -73,8 +86,9 @@ function requirejs_get_library_path() {
 }
 
 function _requirejs_check_bin($name) {
-  foreach(array('/usr/bin', '/usr/local/bin') as $base) {
-    $path = $base . '/' . $name;
+  $bins = array('/usr/bin', '/usr/local/bin');
+  for ($i = 0, $len = count($bins); $i < $len; $i++) {
+    $path = $bins[$i] . '/' . $name;
     if (file_exists($path)) {
       return $path;
     }
@@ -87,13 +101,13 @@ function requirejs_get_optimizer_path() {
   if (is_null($path)) {
     $path = variable_get('requirejs_optimizer_path', NULL);
     if (!$path) {
-      // attempt some sensible defaults
+      // Attempt some sensible defaults.
       $node_path = _requirejs_check_bin('node');
       $node_path = is_null($node_path) ? _requirejs_check_bin('nodejs') : $node_path;
       if ($node_path && ($rjs_path = _requirejs_check_bin('r.js'))) {
         $path = "$node_path $rjs_path";
       }
-      else if ($node_path && ($library_path = requirejs_get_library_path()) && file_exists("$library_path/r.js")) {
+      elseif ($node_path && ($library_path = requirejs_get_library_path()) && file_exists("$library_path/r.js")) {
         $path = "$node_path $library_path/r.js";
       }
       else {
@@ -110,7 +124,7 @@ function requirejs_clear_optimizer_cache() {
 }
 
 /**
- * Implementation of hook_flush_caches().
+ * Implements hook_flush_caches().
  */
 function requirejs_flush_caches() {
   requirejs_clear_optimizer_cache();
@@ -174,13 +188,13 @@ function requirejs_get_layers($rebuild = FALSE) {
       }
     }
     if (is_null($layers)) {
-      $layers = (array)module_invoke_all('requirejs_layers');
+      $layers = (array) module_invoke_all('requirejs_layers');
       drupal_alter('requirejs_layers', $layers);
       cache_set('requirejs:layers', $layers);
     }
   }
 
-  return (array)$layers;
+  return (array) $layers;
 }
 
 function requirejs_get_paths($rebuild = FALSE) {
@@ -201,7 +215,7 @@ function requirejs_get_paths($rebuild = FALSE) {
       $path = requirejs_get_library_path();
 
       if ($path) {
-        // default paths for built-in plugins
+        // Default paths for built-in plugins.
         $paths = array(
           'text'     => "$path/text",
           'domReady' => "$path/domReady",
@@ -210,8 +224,8 @@ function requirejs_get_paths($rebuild = FALSE) {
           'i18n'     => "$path/i18n",
         );
 
-        // override with stuff from other modules
-        $paths = array_merge($paths, (array)module_invoke_all('requirejs_paths'));
+        // Override with stuff from other modules.
+        $paths = array_merge($paths, (array) module_invoke_all('requirejs_paths'));
         drupal_alter('requirejs_paths', $paths);
 
         cache_set('requirejs:paths', $paths);
@@ -219,7 +233,7 @@ function requirejs_get_paths($rebuild = FALSE) {
     }
   }
 
-  return (array)$paths;
+  return (array) $paths;
 }
 
 function requirejs_add_core() {
@@ -253,36 +267,41 @@ function requirejs_add($module) {
     }
   }
 
-  $modules[] = (string)$module;
+  $modules[] = (string) $module;
 }
 
 function requirejs_preprocess_page(&$variables) {
   $path = requirejs_get_library_path();
-  if (!$path) return;
+
+  if (!$path) {
+    return;
+  }
 
   $modules = requirejs_add(NULL);
-  if (empty($modules)) return;
+
+  if (empty($modules)) {
+    return;
+  }
 
   $paths = requirejs_get_paths();
 
-  // add the paths from the optimizer
+  // Add the paths from the optimizer.
   if (variable_get('requirejs_optimizer_enabled', FALSE) && requirejs_get_optimizer_path()) {
     foreach (requirejs_get_layers() as $name => $profile) {
       $paths[$name] = filesondemand_create_path('requirejs', $name);
     }
   }
 
-  // build the requirejs settings!
+  // Build the requirejs settings!
   $settings = requirejs_settings();
   $settings['baseUrl'] = base_path();
   $settings['paths'] = $paths;
   $settings['deps'] = $modules;
 
-  // create the HTML/JS to put into the page
-  $js =  "<script>\n<!--//--><![CDATA[//><!--\n";
+  // Create the HTML/JS to put into the page.
+  $js = "<script>\n<!--//--><![CDATA[//><!--\n";
   $js .= "require = " . drupal_to_js($settings) . ";\n";
   $js .= "//--><!]]>\n</script>\n";
 
   $variables['scripts'] = $js . $variables['scripts'];
 }
-

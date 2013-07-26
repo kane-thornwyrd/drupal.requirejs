@@ -5,8 +5,8 @@
  */
 function requirejs_menu() {
   $items = array();
-  $items['admin/settings/requirejs'] = array(
-    'title' => 'Require.js settings',
+  $items['admin/config/development/requirejs'] = array(
+    'title' => 'Require.js',
     'description' => 'Settings for require.js interegration',
     'access arguments' => array('administer requirejs'),
     'page callback' => 'drupal_get_form',
